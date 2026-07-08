@@ -49,7 +49,7 @@ class JointStateSubscriber(Node):
         target_joint_vel = 0.0 #机器人关节到达目标位置时必须停下，保持这个角度不动，所以期望速度必须为0
 
         # target_joint_pos, target_joint_vel
-        return 0, 0
+        return target_joint_pos, target_joint_vel
 
     def calculate_torque(self, joint_pos, joint_vel, target_joint_pos, target_joint_vel):
         ####
