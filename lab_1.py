@@ -10,7 +10,7 @@ import signal
 JOINT_NAME = "leg_front_l_1"
 ####
 ####
-KP = 0.0  # YOUR KP VALUE
+KP = 2.0  # YOUR KP VALUE
 KD = 0.0  # YOUR KD VALUE
 ####
 ####
@@ -57,14 +57,7 @@ class JointStateSubscriber(Node):
         ####
         error = target_joint_pos - joint_pos
 
-        tolerance = 0.05
-
-        if error > tolerance: #还没到目标，需要正向发力
-            torque = MAX_TORQUE
-        elif error < -tolerance: #超过目标了，需要反向拉回
-            torque = -MAX_TORQUE
-        else :
-            torque = 0.0
+        torque = KP * error #若误差越大给的力矩越大，误差越小给的力矩越小，更加平滑
         
         return torque
 
