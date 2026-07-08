@@ -11,7 +11,7 @@ JOINT_NAME = "leg_front_l_1"
 ####
 ####
 KP = 2.0  # YOUR KP VALUE
-KD = 0.0  # YOUR KD VALUE
+KD = 0.3  # YOUR KD VALUE
 ####
 ####
 LOOP_RATE = 200  # Hz
@@ -55,9 +55,10 @@ class JointStateSubscriber(Node):
         ####
         #### YOUR CODE HERE
         ####
-        error = target_joint_pos - joint_pos
+        error_pos = target_joint_pos - joint_pos
+        error_vel = target_joint_vel - joint_vel
 
-        torque = KP * error #若误差越大给的力矩越大，误差越小给的力矩越小，更加平滑
+        torque = KP * error_pos + KD * error_vel #角度误差越大，P控制给的力矩越大，则角速度越大，角速度越大D阻尼越大，角度误差越小，P给的力矩越小，则角速度越小，D阻尼越小，实现平滑操作
         
         return torque
 
