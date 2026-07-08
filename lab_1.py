@@ -39,12 +39,14 @@ class JointStateSubscriber(Node):
         # self.torque_history = deque(maxlen=DELAY)
 
         # Create a timer to run control_loop at the specified frequency
-        self.create_timer(1.0 / LOOP_RATE, self.control_loop)
+        self.create_timer(1.0 / LOOP_RATE, self.control_loop) #loop_Rate = 200hz,这个函数的作用相当于每秒调用control_loop 200次
 
     def get_target_joint_info(self):
         ####
         #### YOUR CODE HERE
         ####
+        target_joint_pos = 0.5 #设置一个固定值用于测试
+        target_joint_vel = 0.0 #机器人关节到达目标位置时必须停下，保持这个角度不动，所以期望速度必须为0
 
         # target_joint_pos, target_joint_vel
         return 0, 0
@@ -53,41 +55,57 @@ class JointStateSubscriber(Node):
         ####
         #### YOUR CODE HERE
         ####
+        error = target_joint_pos - joint_pos
+
+        tolerance = 0.05
+
+        if error > tolerance: #还没到目标，需要正向发力
+            torque = MAX_TORQUE
+        elif error < -tolerance: #超过目标了，需要反向拉回
+            torque = -MAX_TORQUE
+        else :
+            torque = 0.0
         
-        return 0.0
+        return torque
 
     def print_info(self):
         """Print joint information every 2 control loops"""
-        if self.print_counter == 0:
+        if self.print_counter == 0: #当计数器=0时，打印日志 
             self.get_logger().info(
                 f"Pos: {self.joint_pos:.2f}, Target Pos: {self.target_joint_pos:.2f}, Vel: {self.joint_vel:.2f}, Target Vel: {self.target_joint_vel:.2f}, Tor: {self.calculated_torque:.2f}"
             )
+        #隔一轮打印一次
         self.print_counter += 1
         self.print_counter %= 2
 
-    def get_joint_info(self, msg):
+    def get_joint_info(self, msg): #获取机器人左前腿关节1的角度和角速度
         """Callback function to process incoming JointState messages"""
         joint_index = msg.name.index(JOINT_NAME)
         joint_pos = msg.position[joint_index]
         joint_vel = msg.velocity[joint_index]
 
-        self.joint_pos = joint_pos
+        #更新机器人左前腿关节1(髋关节)的状态信息
+        self.joint_pos = joint_pos 
         self.joint_vel = joint_vel
 
         return joint_pos, joint_vel
 
     def control_loop(self):
         """Control control loop to calculate and publish torque commands"""
-        self.target_joint_pos, self.target_joint_vel = self.get_target_joint_info()
-        self.calculated_torque = self.calculate_torque(
+        #更新目标关节角度和角速度
+        self.target_joint_pos, self.target_joint_vel = self.get_target_joint_info() 
+        #更新力矩
+        self.calculated_torque = self.calculate_torque(  
             self.joint_pos, self.joint_vel, self.target_joint_pos, self.target_joint_vel
         )
         self.print_info()
+        #发送力矩数据
         self.publish_torque(self.calculated_torque)
 
     def publish_torque(self, torque=0.0):
         # Create a Float64MultiArray message with zero kp and kd values
         command_msg = Float64MultiArray()
+        #限制力矩大小，防止超过机器限制
         torque = np.clip(torque, -MAX_TORQUE, MAX_TORQUE)
         command_msg.data = [torque, 0.0, 0.0]  # Zero kp and kd values
 
@@ -99,19 +117,19 @@ def main(args=None):
     rclpy.init(args=args)
 
     # Create the node
-    joint_state_subscriber = JointStateSubscriber()
+    joint_state_subscriber = JointStateSubscriber() #建立实力，命名为joint_state_subscriber
 
-    # Install a SIGINT handler that sends zero torque BEFORE shutting down the context
-    def _handle_sigint(sig, frame):
-        joint_state_subscriber.get_logger().info("SIGINT received: sending zero torque and shutting down...")
+    # Install a SIGINT handler that sends zero torque BEFORE shutting down the context 安全降落伞
+    def _handle_sigint(sig, frame): 
+        joint_state_subscriber.get_logger().info("SIGINT received: sending zero torque and shutting down...") #提示收到中断信号
         joint_state_subscriber.publish_torque(0.0)
-        time.sleep(0.1) 
-        joint_state_subscriber.publish_torque(0.0)
-        rclpy.shutdown()
+        time.sleep(0.1)  #等待0.1s
+        joint_state_subscriber.publish_torque(0.0) #Ros处理消息有延迟，发送两次确保”零力矩“被彻底接收并执行
+        rclpy.shutdown() #安全关闭
 
     signal.signal(signal.SIGINT, _handle_sigint)
 
-    rclpy.spin(joint_state_subscriber)
+    rclpy.spin(joint_state_subscriber) #阻塞式循环，会不断检查是否有新的/joint_states消息，如果有就触发get_joint_info函数
   
 
 if __name__ == "__main__":
